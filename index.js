@@ -45,8 +45,15 @@ async function startBot() {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", (update) => {
-    if (update.connection === "open") {
+    const { connection } = update;
+
+    if (connection === "open") {
       console.log("✅ Bot connected as", BOT_NAME);
+    }
+
+    if (update.qr) {
+      console.log("📱 Scan this QR in WhatsApp:");
+      console.log(update.qr);
     }
   });
 
@@ -79,6 +86,11 @@ async function startBot() {
       text: reply
     });
   });
+
+  console.log("🚀 Bot starting...");
 }
 
 startBot();
+
+// 🔥 CRITICAL: keep GitHub Actions alive so QR can appear
+setInterval(() => {}, 1000);
