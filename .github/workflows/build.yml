@@ -17,8 +17,29 @@ jobs:
 
       - run: npm install
 
-      # CI mode: uses terminal QR (index.js), not the web server
-      - run: npm run ci
+      # Install ngrok
+      - name: Install ngrok
+        run: |
+          curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+            | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+            | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt-get update -q && sudo apt-get install -yq ngrok
+          ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
+
+      # Start bot + tunnel, print the public URL, then wait
+      - name: Start bot and tunnel
+        run: |
+          npm start &
+          sleep 5
+          ngrok http 3000 --log=stdout &
+          sleep 5
+          curl -s http://localhost:4040/api/tunnels \
+            | grep -o '"public_url":"[^"]*' \
+            | grep https \
+            | cut -d'"' -f4 \
+            | xargs -I{} echo "🌐 OPEN THIS TO SCAN QR: {}"
+          wait
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           BOT_NAME: ${{ secrets.BOT_NAME }}
