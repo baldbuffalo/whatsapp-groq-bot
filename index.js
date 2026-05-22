@@ -8,29 +8,34 @@ const BOT_NAME = process.env.BOT_NAME || "chatgpt";
 const PREFIX = process.env.PREFIX || "!ai";
 
 async function askAI(prompt) {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: "llama-3.1-70b-versatile",
-      messages: [
-        {
-          role: "system",
-          content: "You are ChatGPT inside a WhatsApp group. Keep answers short and helpful."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    })
-  });
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: "You are ChatGPT inside a WhatsApp group. Keep answers short, clear, and helpful."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      })
+    });
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "No response";
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || "No response from AI";
+  } catch (err) {
+    console.log("AI ERROR:", err);
+    return "AI request failed";
+  }
 }
 
 async function startBot() {
@@ -45,52 +50,70 @@ async function startBot() {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", (update) => {
-    const { connection } = update;
+    const { connection, qr } = update;
 
-    if (connection === "open") {
-      console.log("✅ Bot connected as", BOT_NAME);
+    console.log("🔄 Connection update:", connection);
+
+    if (qr) {
+      console.log("\n======================");
+      console.log("📱 SCAN THIS QR CODE:");
+      console.log(qr);
+      console.log("======================\n");
     }
 
-    if (update.qr) {
-      console.log("📱 Scan this QR in WhatsApp:");
-      console.log(update.qr);
+    if (connection === "open") {
+      console.log("✅ BOT CONNECTED SUCCESSFULLY AS:", BOT_NAME);
+    }
+
+    if (connection === "close") {
+      console.log("❌ Connection closed");
     }
   });
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg.message) return;
+    try {
+      const msg = messages[0];
+      if (!msg.message) return;
 
-    const text =
-      msg.message.conversation ||
-      msg.message.extendedTextMessage?.text;
+      const text =
+        msg.message.conversation ||
+        msg.message.extendedTextMessage?.text;
 
-    if (!text) return;
+      if (!text) return;
 
-    const isCommand =
-      text.startsWith(PREFIX) ||
-      text.toLowerCase().includes(BOT_NAME);
+      const isCommand =
+        text.startsWith(PREFIX) ||
+        text.toLowerCase().includes(BOT_NAME);
 
-    if (!isCommand) return;
+      if (!isCommand) return;
 
-    const prompt = text
-      .replace(PREFIX, "")
-      .replace(new RegExp(BOT_NAME, "gi"), "")
-      .trim();
+      const prompt = text
+        .replace(PREFIX, "")
+        .replace(new RegExp(BOT_NAME, "gi"), "")
+        .trim();
 
-    if (!prompt) return;
+      if (!prompt) return;
 
-    const reply = await askAI(prompt);
+      console.log("💬 User prompt:", prompt);
 
-    await sock.sendMessage(msg.key.remoteJid, {
-      text: reply
-    });
+      const reply = await askAI(prompt);
+
+      await sock.sendMessage(msg.key.remoteJid, {
+        text: reply
+      });
+
+    } catch (err) {
+      console.log("MESSAGE ERROR:", err);
+    }
   });
 
-  console.log("🚀 Bot starting...");
+  console.log("🚀 Bot starting... waiting for QR...");
 }
 
+// start bot
 startBot();
 
-// 🔥 CRITICAL: keep GitHub Actions alive so QR can appear
-setInterval(() => {}, 1000);
+// 🔥 KEEP GITHUB ACTION ALIVE (CRITICAL)
+setInterval(() => {
+  console.log("⏳ Bot alive...");
+}, 60000);
