@@ -32,7 +32,7 @@ jobs:
         run: |
           npm start &
           sleep 5
-          ngrok http 3000 --log=stdout &
+          ngrok http 3000 --log=stdout --pooling-enabled &
           sleep 5
           curl -s http://localhost:4040/api/tunnels \
             | grep -o '"public_url":"[^"]*' \
