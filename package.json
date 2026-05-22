@@ -1,0 +1,14 @@
+{
+  "name": "whatsapp-groq-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "pino": "^9.0.0",
+    "dotenv": "^16.4.5"
+  }
+}
