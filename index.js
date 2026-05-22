@@ -20,7 +20,7 @@ async function askAI(prompt) {
         messages: [
           {
             role: "system",
-            content: "You are ChatGPT inside a WhatsApp group. Keep answers short, clear, and helpful."
+            content: "You are ChatGPT inside WhatsApp. Keep replies short and useful."
           },
           {
             role: "user",
@@ -31,10 +31,10 @@ async function askAI(prompt) {
     });
 
     const data = await res.json();
-    return data?.choices?.[0]?.message?.content || "No response from AI";
+    return data?.choices?.[0]?.message?.content || "No response";
   } catch (err) {
     console.log("AI ERROR:", err);
-    return "AI request failed";
+    return "AI failed";
   }
 }
 
@@ -44,7 +44,8 @@ async function startBot() {
   const sock = makeWASocket({
     auth: state,
     logger: P({ level: "silent" }),
-    printQRInTerminal: true
+    printQRInTerminal: true,
+    browser: ["ChatGPT Bot", "Chrome", "1.0.0"]
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -52,17 +53,17 @@ async function startBot() {
   sock.ev.on("connection.update", (update) => {
     const { connection, qr } = update;
 
-    console.log("🔄 Connection update:", connection);
+    console.log("🔄 connection:", connection);
 
     if (qr) {
-      console.log("\n======================");
-      console.log("📱 SCAN THIS QR CODE:");
+      console.log("\n====================");
+      console.log("📱 SCAN QR BELOW:");
       console.log(qr);
-      console.log("======================\n");
+      console.log("====================\n");
     }
 
     if (connection === "open") {
-      console.log("✅ BOT CONNECTED SUCCESSFULLY AS:", BOT_NAME);
+      console.log("✅ Bot connected:", BOT_NAME);
     }
 
     if (connection === "close") {
@@ -94,7 +95,7 @@ async function startBot() {
 
       if (!prompt) return;
 
-      console.log("💬 User prompt:", prompt);
+      console.log("💬 Prompt:", prompt);
 
       const reply = await askAI(prompt);
 
@@ -103,7 +104,7 @@ async function startBot() {
       });
 
     } catch (err) {
-      console.log("MESSAGE ERROR:", err);
+      console.log("MSG ERROR:", err);
     }
   });
 
@@ -113,7 +114,7 @@ async function startBot() {
 // start bot
 startBot();
 
-// 🔥 KEEP GITHUB ACTION ALIVE (CRITICAL)
+// 🔥 CRITICAL: keep GitHub Actions alive
 setInterval(() => {
-  console.log("⏳ Bot alive...");
+  console.log("⏳ alive...");
 }, 60000);
