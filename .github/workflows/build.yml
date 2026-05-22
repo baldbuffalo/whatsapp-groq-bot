@@ -17,7 +17,9 @@ jobs:
 
       - run: npm install
 
-      # run bot (this must stay running for QR)
-      - run: node index.js
+      # CI mode: uses terminal QR (index.js), not the web server
+      - run: npm run ci
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          BOT_NAME: ${{ secrets.BOT_NAME }}
+          PREFIX: ${{ secrets.PREFIX }}
