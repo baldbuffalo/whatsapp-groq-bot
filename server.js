@@ -175,9 +175,6 @@ async function startBot() {
       const msg = messages[0];
       if (!msg?.message) return;
 
-      // BUG FIX: ignore messages sent by the bot itself
-      if (msg.key.fromMe) return;
-
       const text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
