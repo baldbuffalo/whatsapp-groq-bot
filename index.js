@@ -1,11 +1,11 @@
-import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys';
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
 import P from 'pino';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const BOT_NAME = process.env.BOT_NAME || "chatgpt";
-const PREFIX = process.env.PREFIX || "!ai";
+const PREFIX   = process.env.PREFIX   || "!ai";
 
 async function askAI(prompt) {
   try {
@@ -22,10 +22,7 @@ async function askAI(prompt) {
             role: "system",
             content: "You are ChatGPT inside WhatsApp. Keep replies short and useful."
           },
-          {
-            role: "user",
-            content: prompt
-          }
+          { role: "user", content: prompt }
         ]
       })
     });
@@ -33,8 +30,8 @@ async function askAI(prompt) {
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || "No response";
   } catch (err) {
-    console.log("AI ERROR:", err);
-    return "AI failed";
+    console.error("AI ERROR:", err);
+    return "AI failed — please try again.";
   }
 }
 
@@ -51,70 +48,66 @@ async function startBot() {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", (update) => {
-    const { connection, qr } = update;
-
-    console.log("🔄 connection:", connection);
-
-    if (qr) {
-      console.log("\n====================");
-      console.log("📱 SCAN QR BELOW:");
-      console.log(qr);
-      console.log("====================\n");
-    }
+    const { connection, lastDisconnect } = update;
 
     if (connection === "open") {
-      console.log("✅ Bot connected:", BOT_NAME);
+      console.log(`✅ Bot connected: ${BOT_NAME}`);
     }
 
     if (connection === "close") {
-      console.log("❌ Connection closed");
+      const code = lastDisconnect?.error?.output?.statusCode;
+      const shouldReconnect = code !== DisconnectReason.loggedOut;
+      console.log(`❌ Connection closed (code ${code}). Reconnecting: ${shouldReconnect}`);
+      if (shouldReconnect) startBot();
     }
   });
 
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+  sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    // only handle newly received messages, not history sync
+    if (type !== "notify") return;
+
     try {
       const msg = messages[0];
-      if (!msg.message) return;
+      if (!msg?.message) return;
+
+      // BUG FIX: ignore messages sent by the bot itself
+      if (msg.key.fromMe) return;
 
       const text =
         msg.message.conversation ||
-        msg.message.extendedTextMessage?.text;
+        msg.message.extendedTextMessage?.text ||
+        "";
 
       if (!text) return;
 
+      const lower = text.toLowerCase();
       const isCommand =
-        text.startsWith(PREFIX) ||
-        text.toLowerCase().includes(BOT_NAME);
+        lower.startsWith(PREFIX.toLowerCase()) ||
+        lower.includes(BOT_NAME.toLowerCase());
 
       if (!isCommand) return;
 
       const prompt = text
-        .replace(PREFIX, "")
+        .replace(new RegExp(`^${PREFIX}`, "i"), "")
         .replace(new RegExp(BOT_NAME, "gi"), "")
         .trim();
 
       if (!prompt) return;
 
-      console.log("💬 Prompt:", prompt);
+      console.log(`💬 Prompt: ${prompt}`);
 
       const reply = await askAI(prompt);
 
-      await sock.sendMessage(msg.key.remoteJid, {
-        text: reply
-      });
-
+      await sock.sendMessage(msg.key.remoteJid, { text: reply });
     } catch (err) {
-      console.log("MSG ERROR:", err);
+      console.error("MSG ERROR:", err);
     }
   });
 
-  console.log("🚀 Bot starting... waiting for QR...");
+  console.log("🚀 Bot starting… waiting for QR scan…");
 }
 
-// start bot
 startBot();
 
-// 🔥 CRITICAL: keep GitHub Actions alive
-setInterval(() => {
-  console.log("⏳ alive...");
-}, 60000);
+// Keep GitHub Actions alive
+setInterval(() => console.log("⏳ alive…"), 60_000);
