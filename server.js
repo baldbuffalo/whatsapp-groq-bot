@@ -174,6 +174,7 @@ async function startBot() {
     try {
       const msg = messages[0];
       if (!msg?.message) return;
+      if (msg.key.fromMe) return;
 
       const text =
         msg.message.conversation ||
