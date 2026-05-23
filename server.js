@@ -108,21 +108,21 @@ async function askAI(prompt) {
         "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama-3.1-70b-versatile",
+        model: "llama-3.3-70b-versatile",   // ← fixed
         messages: [
-          {
-            role: "system",
-            content: "You are ChatGPT inside WhatsApp. Keep replies short and useful."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
+          { role: "system", content: "You are a helpful assistant inside WhatsApp. Keep replies short and useful." },
+          { role: "user", content: prompt }
         ]
       })
     });
 
     const data = await res.json();
+
+    if (!res.ok) {
+      console.error("GROQ API ERROR:", JSON.stringify(data));
+      return "AI failed — please try again.";
+    }
+
     return data?.choices?.[0]?.message?.content || "No response";
   } catch (err) {
     console.error("AI ERROR:", err);
