@@ -108,9 +108,9 @@ async function askAI(prompt) {
         "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",   // ← fixed
+        model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: "You are a helpful assistant inside WhatsApp. Keep replies short and useful." },
+          { role: "system", content: "You are ChatGPT, a helpful AI assistant made by OpenAI. Never reveal that you are built on Llama or any other model. Keep replies short and useful." },
           { role: "user", content: prompt }
         ]
       })
@@ -127,6 +127,18 @@ async function askAI(prompt) {
   } catch (err) {
     console.error("AI ERROR:", err);
     return "AI failed — please try again.";
+  }
+}
+
+// ── Sent message ID tracking (for reply detection) ────────────────────────────
+const sentMessageIds = new Set();
+const MAX_TRACKED = 200;
+
+function trackSentId(id) {
+  if (!id) return;
+  sentMessageIds.add(id);
+  if (sentMessageIds.size > MAX_TRACKED) {
+    sentMessageIds.delete(sentMessageIds.values().next().value);
   }
 }
 
@@ -182,17 +194,35 @@ async function startBot() {
 
       if (!text) return;
 
+      // ── Reply detection ───────────────────────────────────────────────────
+      const contextInfo = msg.message.extendedTextMessage?.contextInfo;
+      const quotedId    = contextInfo?.stanzaId;
+      const isReplyToBot = quotedId && sentMessageIds.has(quotedId);
+
+      // ── Trigger check ─────────────────────────────────────────────────────
       const lower = text.toLowerCase();
       const isCommand =
         lower.startsWith(PREFIX.toLowerCase()) ||
-        lower.includes(BOT_NAME.toLowerCase());
+        lower.startsWith(BOT_NAME.toLowerCase()) ||
+        isReplyToBot;
 
       if (!isCommand) return;
 
-      const prompt = text
+      // ── Build prompt (strip trigger, include quoted context if present) ───
+      let userText = text
         .replace(new RegExp(`^${PREFIX}`, "i"), "")
-        .replace(new RegExp(BOT_NAME, "gi"), "")
+        .replace(new RegExp(`^${BOT_NAME}`, "i"), "")
         .trim();
+
+      // Attach the quoted message as context so the AI can read it
+      const quotedText =
+        contextInfo?.quotedMessage?.conversation ||
+        contextInfo?.quotedMessage?.extendedTextMessage?.text ||
+        "";
+
+      const prompt = quotedText
+        ? `[Quoted message: "${quotedText}"]\n${userText || "What is this?"}`
+        : userText;
 
       if (!prompt) return;
 
@@ -200,7 +230,8 @@ async function startBot() {
 
       const reply = await askAI(prompt);
 
-      await sock.sendMessage(msg.key.remoteJid, { text: reply });
+      const sent = await sock.sendMessage(msg.key.remoteJid, { text: reply });
+      trackSentId(sent?.key?.id);
     } catch (err) {
       console.error("MSG ERROR:", err);
     }
