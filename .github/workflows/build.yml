@@ -24,28 +24,24 @@ jobs:
           path: ./auth
           key: whatsapp-auth
 
-      # Install ngrok
-      - name: Install ngrok
+      # Install Cloudflare Tunnel
+      - name: Install cloudflared
         run: |
-          curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-            | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
-            | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt-get update -q && sudo apt-get install -yq ngrok
-          ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
+          curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+            | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+          echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+            | sudo tee /etc/apt/sources.list.d/cloudflared.list
+          sudo apt-get update -q && sudo apt-get install -yq cloudflared
 
       # Start bot + tunnel, print the public URL, then wait
       - name: Start bot and tunnel
         run: |
           npm start &
           sleep 5
-          ngrok http 3000 --log=stdout --pooling-enabled &
-          sleep 5
-          curl -s http://localhost:4040/api/tunnels \
-            | grep -o '"public_url":"[^"]*' \
-            | grep https \
-            | cut -d'"' -f4 \
-            | xargs -I{} echo "🌐 OPEN THIS TO SCAN QR: {}"
+          cloudflared tunnel --url http://localhost:3000 --no-autoupdate 2>&1 | \
+            tee /tmp/cf.log | grep -m1 "trycloudflare.com" | \
+            grep -o 'https://[^ ]*trycloudflare.com' | \
+            xargs -I{} echo "🌐 OPEN THIS TO SCAN QR: {}" &
           wait
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
