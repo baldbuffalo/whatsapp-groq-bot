@@ -16,6 +16,18 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Cache latest QR + state so late-joining browsers catch up
+let lastQR = null;
+let botConnectedName = null;
+
+io.on("connection", (socket) => {
+  if (botConnectedName) {
+    socket.emit("connected", botConnectedName);
+  } else if (lastQR) {
+    socket.emit("qr", lastQR);
+  }
+});
+
 // ── UI ────────────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.send(`<!DOCTYPE html>
@@ -159,6 +171,8 @@ async function startBot() {
 
     if (qr) {
       const img = await QRCode.toDataURL(qr);
+      lastQR = img;
+      botConnectedName = null;
       io.emit("qr", img);
       console.log(`QR ready — open http://localhost:${PORT}`);
     }
@@ -167,10 +181,13 @@ async function startBot() {
       const botJid  = sock.user?.id || "unknown";
       const botName = sock.user?.name || BOT_NAME;
       console.log(`✅ Bot connected: ${botName} (${botJid})`);
+      lastQR = null;
+      botConnectedName = botName;
       io.emit("connected", botName);
     }
 
     if (connection === "close") {
+      botConnectedName = null;
       io.emit("disconnected");
       const code = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = code !== DisconnectReason.loggedOut;
