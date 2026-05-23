@@ -111,7 +111,7 @@ app.get("/", (req, res) => {
 });
 
 // ── AI ────────────────────────────────────────────────────────────────────────
-async function askAI(prompt) {
+async function askAI(messages) {
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -123,7 +123,7 @@ async function askAI(prompt) {
         model: "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: "You are ChatGPT. Talk like a real person — casual, natural, like texting a friend. Use short sentences. Match the user's energy and tone. If they're chill, be chill. If they send an emoji, respond naturally like a human would, not by explaining the emoji. Don't use bullet points or formal structure unless specifically asked. Never reveal that you are built on Llama or any other model." },
-          { role: "user", content: prompt }
+          ...messages
         ]
       })
     });
@@ -237,15 +237,18 @@ async function startBot() {
         contextInfo?.quotedMessage?.extendedTextMessage?.text ||
         "";
 
-      const prompt = quotedText
-        ? `[Quoted message: "${quotedText}"]\n${userText || "What is this?"}`
-        : userText;
+      if (!userText && !quotedText) return;
 
-      if (!prompt) return;
+      // Build conversation history so AI treats it as a real chat thread
+      const messages = [];
+      if (quotedText) {
+        messages.push({ role: "assistant", content: quotedText });
+      }
+      messages.push({ role: "user", content: userText || "what do you think?" });
 
-      console.log(`💬 [${msg.key.remoteJid}] ${prompt}`);
+      console.log(`💬 [${msg.key.remoteJid}] ${userText || "(reply)"}`);
 
-      const reply = await askAI(prompt);
+      const reply = await askAI(messages);
 
       const sent = await sock.sendMessage(msg.key.remoteJid, { text: reply });
       trackSentId(sent?.key?.id);
