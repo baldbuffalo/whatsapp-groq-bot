@@ -33,20 +33,34 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/cloudflared.list
           sudo apt-get update -q && sudo apt-get install -yq cloudflared
 
-      # Start bot + tunnel, print the public URL, then wait
-      - name: Start bot and tunnel
-        run: |
-          npm start &
-          sleep 5
-          cloudflared tunnel --url http://localhost:3000 --no-autoupdate 2>&1 | \
-            tee /tmp/cf.log | grep -m1 "trycloudflare.com" | \
-            grep -o 'https://[^ ]*trycloudflare.com' | \
-            xargs -I{} echo "🌐 OPEN THIS TO SCAN QR: {}" &
-          wait
+      # Start bot
+      - name: Start bot
+        run: npm start &
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           BOT_NAME: ${{ secrets.BOT_NAME }}
           PREFIX: ${{ secrets.PREFIX }}
+
+      - name: Wait for bot to be ready
+        run: sleep 5
+
+      # Start tunnel and print URL clearly
+      - name: Start Cloudflare tunnel
+        run: |
+          cloudflared tunnel --url http://localhost:3000 --no-autoupdate > /tmp/cf.log 2>&1 &
+          echo "Waiting for tunnel..."
+          for i in $(seq 1 30); do
+            URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' /tmp/cf.log | head -1)
+            if [ -n "$URL" ]; then
+              echo ""
+              echo "========================================="
+              echo "🌐 OPEN THIS TO SCAN QR: $URL"
+              echo "========================================="
+              break
+            fi
+            sleep 2
+          done
+          wait
 
       # Save auth session after bot exits (even if cancelled)
       - name: Save auth session
