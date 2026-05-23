@@ -16,11 +16,11 @@ async function askAI(prompt) {
         "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
       },
       body: JSON.stringify({
-        model: "llama-3.1-70b-versatile",
+        model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
-            content: "You are ChatGPT inside WhatsApp. Keep replies short and useful."
+            content: "You are a helpful AI assistant inside WhatsApp. Keep replies short and useful."
           },
           { role: "user", content: prompt }
         ]
@@ -28,7 +28,13 @@ async function askAI(prompt) {
     });
 
     const data = await res.json();
-    return data?.choices?.[0]?.message?.content || "No response";
+
+    if (!res.ok) {
+      console.error("GROQ API ERROR:", JSON.stringify(data));
+      return "AI failed — please try again.";
+    }
+
+    return data?.choices?.[0]?.message?.content || "No response from model.";
   } catch (err) {
     console.error("AI ERROR:", err);
     return "AI failed — please try again.";
@@ -42,7 +48,7 @@ async function startBot() {
     auth: state,
     logger: P({ level: "silent" }),
     printQRInTerminal: true,
-    browser: ["ChatGPT Bot", "Chrome", "1.0.0"]
+    browser: ["WhatsApp AI Bot", "Chrome", "1.0.0"]
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -63,14 +69,13 @@ async function startBot() {
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    // only handle newly received messages, not history sync
     if (type !== "notify") return;
 
     try {
       const msg = messages[0];
       if (!msg?.message) return;
 
-      // BUG FIX: ignore messages sent by the bot itself
+      // Ignore messages sent by the bot itself
       if (msg.key.fromMe) return;
 
       const text =
