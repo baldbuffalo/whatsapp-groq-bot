@@ -1,4 +1,4 @@
-app = "wa-bot-yourname"
+app = "github-actions"
 primary_region = "sin"
 
 [build]
