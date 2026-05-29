@@ -16,12 +16,12 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Create app
-        run: flyctl apps create ${{ github.event.inputs.app_name }} || true
+        run: flyctl apps create ${{ github.event.inputs.app_name }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Create volume
-        run: flyctl volumes create auth_data --size 1 --region sin --app ${{ github.event.inputs.app_name }} --yes || true
+        run: flyctl volumes create auth_data --size 1 --region sin --app ${{ github.event.inputs.app_name }} --yes
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
