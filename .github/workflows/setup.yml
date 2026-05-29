@@ -1,0 +1,36 @@
+name: Setup Fly.io (run once)
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'App name (must match fly.toml)'
+        required: true
+        default: 'wa-bot-yourname'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Create app
+        run: flyctl apps create ${{ github.event.inputs.app_name }} || true
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Create volume
+        run: flyctl volumes create auth_data --size 1 --region sin --app ${{ github.event.inputs.app_name }} --yes || true
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Set secrets on Fly
+        run: |
+          flyctl secrets set \
+            GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+            BOT_NAME="${{ secrets.BOT_NAME }}" \
+            PREFIX="${{ secrets.PREFIX }}" \
+            --app ${{ github.event.inputs.app_name }}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
