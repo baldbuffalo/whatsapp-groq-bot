@@ -6,7 +6,7 @@ on:
       app_name:
         description: 'App name (must match fly.toml)'
         required: true
-        default: 'wa-bot-yourname'
+        default: 'wa-bot-game99'
 
 jobs:
   setup:
